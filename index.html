@@ -49,6 +49,8 @@ pre{background:#12263a;color:#cfe;padding:10px;border-radius:10px;overflow:auto;
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS={g:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},s:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+if(LS.g('rc_app','')!=='vidal-decano-1'){['rc_base','rc_vis','rc_cnt','rc_cfg'].forEach(k=>{try{localStorage.removeItem(k)}catch{}});LS.s('rc_app','vidal-decano-1')}
+let xl=false;
 const DIAS=['LUN','MAR','MIE','JUE','VIE','SAB'],hoy=()=>['DOM',...DIAS][new Date().getDay()],nowM=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
 const turnoDe=h=>h<12?'MAÑANA':h<18?'TARDE':'NOCHE',mins=h=>{const[a,b]=String(h||'0:0').split(':');return(a*60+ +b)||0},dur=(e,s)=>{const x=(mins(s)-mins(e))/60;return x>0?x:2};
 const gk=d=>`${d.carrera}|${d.curso}|${d.materia}|${d.grupo}`;
@@ -68,7 +70,7 @@ function listen(){
  },()=>{$('#st').textContent='Sin permiso en Firestore';$('#st').className='w'});
  F.onSnapshot(F.collection(F.db,'horarios_custom'),s=>{custom={};s.forEach(x=>custom[x.id]=x.data());derive()},()=>{});
  F.onSnapshot(F.collection(F.db,'recorridos_datos'),s=>{
-  if(s.empty&&s.metadata.fromCache)return;
+  if(xl||(s.empty&&s.metadata.fromCache))return;
   let m=null;const ch=[];s.forEach(x=>{if(x.id==='meta')m=x.data();else ch.push(x.data())});
   if(!m)return;meta=m;const mine=ch.filter(c=>c.batch===m.batch).sort((a,b)=>a.i-b.i);
   if(mine.length!==m.chunks)return;base=mine.flatMap(c=>c.rows);LS.s('rc_base',base);derive();
@@ -206,7 +208,7 @@ function datosV(){
 }
 const RULES=`rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
 function ajustes(){
- $('#v-ajustes').innerHTML=`<div class="k"><h4>Horarios</h4><p class="s">${data.length} clases${meta?' · Excel: '+esc(meta.name):''}</p><input type="file" id="xl" accept=".xlsx,.xls"><p class="s">Al cargarlo se guarda en la nube y todos tus dispositivos lo usan sin volver a subirlo. El Excel debe tener una columna <b>Lugar</b> (o Sede / Campus) para poder filtrar por lugar.</p></div>
+ $('#v-ajustes').innerHTML=`<div class="k"><h4>Horarios</h4><p class="s">${data.length} clases${meta?' · Excel: '+esc(meta.name):''}</p><input type="file" id="xl" accept=".xlsx,.xls"><p class="s">Los horarios se leen solos de <b>vidal.xlsx</b> (GitHub) cada vez que abres la app. Subir un Excel aquí es solo una prueba temporal. El Excel debe tener una columna <b>Lugar</b> (o Sede / Campus) para poder filtrar por lugar.</p></div>
  <div class="k"><h4>Lugares</h4><p class="s">${lugs.length?lugs.map(esc).join(' · '):'No se detectó la columna Lugar en el Excel.'}</p></div>
  <div class="k"><h4>Carreras</h4><button style="width:100%" onclick="openS('sCar')">Elegir carreras (${cfg.car?cfg.car.length:cars.length}/${cars.length})</button><p class="s">La configuración se guarda sola.</p></div>
  <details><summary>Reglas de Firestore</summary><p class="s">En Firebase → Firestore → Reglas: borra todo (Ctrl+A), pega solo esto y publica.</p><pre>${esc(RULES)}</pre><button onclick="navigator.clipboard.writeText(RULES).then(()=>toast('Copiado'))">Copiar reglas</button></details>
@@ -244,7 +246,7 @@ $('#q').addEventListener('input',()=>{lim=60;lista()});
 addEventListener('online',status);addEventListener('offline',status);
 setInterval(()=>{if(tab==='ruta'&&!document.querySelector('.sh.o')&&document.activeElement.tagName!=='INPUT')render()},60000);
 derive();
-if(!base.length)fetch('vidal.xlsx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(async b=>{await loadX();base=parse(b);LS.s('rc_base',base);derive()}).catch(()=>{});
+fetch('vidal.xlsx?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(async b=>{await loadX();const r=parse(b);if(!r.length)throw 0;xl=true;base=r;LS.s('rc_base',r);meta={name:'vidal.xlsx (GitHub)',chunks:meta?.chunks||0};derive();toast(r.length+' clases leídas de vidal.xlsx')}).catch(()=>toast('No se pudo leer vidal.xlsx de GitHub. Uso los datos guardados.'));
 </script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
