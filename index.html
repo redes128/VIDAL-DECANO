@@ -37,14 +37,14 @@ pre{background:#12263a;color:#cfe;padding:10px;border-radius:10px;overflow:auto;
 </style></head><body>
 <header><div class="r"><b>Recorridos</b><span id="st"></span><button id="bCar" onclick="openS('sCar')"></button><button onclick="editar()">＋ Horario</button></div><div id="dias"></div></header>
 <main>
-<section id="v-ruta" class="on"><div id="rTop"></div><input id="q" type="search" placeholder="Buscar aula, materia, docente…"><div id="lista"></div></section>
+<section id="v-ruta" class="on"><div id="rTop"></div><input id="q" type="search" placeholder="Buscar aula, materia, docente, lugar…"><div id="lista"></div></section>
 <section id="v-avance"></section><section id="v-datos"></section><section id="v-ajustes"></section>
 </main>
 <nav><button data-t="ruta" class="on">📍<br>Ruta</button><button data-t="avance">📊<br>Avance</button><button data-t="datos">👥<br>Datos</button><button data-t="ajustes">⚙️<br>Ajustes</button></nav>
 <div id="toast"></div>
 <div class="sh" id="sCar"><div><h3>Carreras</h3><div class="seg"><button onclick="car('all')">Todas</button><button onclick="car('none')">Ninguna</button></div><div class="chips" id="carL"></div><button class="p" style="width:100%;margin-top:14px" onclick="closeS()">Listo</button></div></div>
 <div class="sh" id="sCnt"><div><h3 id="cT"></h3><p id="cB" class="s"></p><div style="display:flex;gap:8px"><button onclick="cstep(-1)">−</button><input id="cN" type="number" inputmode="numeric" min="0" style="text-align:center;font-size:22px"><button onclick="cstep(1)">＋</button></div><div class="a"><button onclick="closeS()">Cancelar</button><button class="p" onclick="csave()">Guardar</button></div></div></div>
-<div class="sh" id="sEd"><div><h3 id="eT"></h3><div class="f" id="eF"></div><datalist id="dl"></datalist><div class="a"><button onclick="closeS()">Cancelar</button><button id="eD" class="x" onclick="edel()">Eliminar</button><button class="p" onclick="esave()">Guardar</button></div></div></div>
+<div class="sh" id="sEd"><div><h3 id="eT"></h3><div class="f" id="eF"></div><datalist id="dl"></datalist><datalist id="dlL"></datalist><div class="a"><button onclick="closeS()">Cancelar</button><button id="eD" class="x" onclick="edel()">Eliminar</button><button class="p" onclick="esave()">Guardar</button></div></div></div>
 
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -52,9 +52,9 @@ const LS={g:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{retu
 const DIAS=['LUN','MAR','MIE','JUE','VIE','SAB'],hoy=()=>['DOM',...DIAS][new Date().getDay()],nowM=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
 const turnoDe=h=>h<12?'MAÑANA':h<18?'TARDE':'NOCHE',mins=h=>{const[a,b]=String(h||'0:0').split(':');return(a*60+ +b)||0},dur=(e,s)=>{const x=(mins(s)-mins(e))/60;return x>0?x:2};
 const gk=d=>`${d.carrera}|${d.curso}|${d.materia}|${d.grupo}`;
-let base=LS.g('rc_base',[]),custom={},vis=LS.g('rc_vis',{}),cnt=LS.g('rc_cnt',{}),cfg={car:null,ord:'hora',term:1,cub:1,u:0,...LS.g('rc_cfg',{})};
-let dia=hoy()==='DOM'?'LUN':hoy(),tur=turnoDe(new Date().getHours()),vista='pend',tab='ruta',lim=60,data=[],cars=[],cubiertos=new Set(),F=null,ops=[],pend=false,cid,eid,meta=null,rq,tt;
-const sel=d=>!cfg.car||cfg.car.includes(d.carrera),rows=()=>data.filter(sel),keep=()=>{LS.s('rc_vis',vis);LS.s('rc_cnt',cnt)};
+let base=LS.g('rc_base',[]),custom={},vis=LS.g('rc_vis',{}),cnt=LS.g('rc_cnt',{}),cfg={car:null,lug:null,ord:'hora',term:1,cub:1,u:0,...LS.g('rc_cfg',{})};
+let dia=hoy()==='DOM'?'LUN':hoy(),tur=turnoDe(new Date().getHours()),vista='pend',tab='ruta',lim=60,data=[],cars=[],lugs=[],cubiertos=new Set(),F=null,ops=[],pend=false,cid,eid,meta=null,rq,tt;
+const sel=d=>(!cfg.car||cfg.car.includes(d.carrera))&&(!cfg.lug||d.lugar===cfg.lug),rows=()=>data.filter(sel),keep=()=>{LS.s('rc_vis',vis);LS.s('rc_cnt',cnt)};
 
 /* ---------- Firestore (escrituras optimistas y en cola) ---------- */
 const W=f=>F?f():ops.push(f),fail=e=>toast('No se pudo guardar: '+(e.code||e)+' (revisa reglas en Ajustes)');
@@ -91,6 +91,7 @@ function derive(){
  const m=base.map(x=>({...x})),del=new Set();
  for(const c of Object.values(custom)){if(c._deleted){del.add(c.id);continue}const i=m.findIndex(x=>x.id===c.id);i>=0?m[i]={...m[i],...c}:m.push({...c})}
  data=m.filter(x=>!del.has(x.id));cars=[...new Set(data.map(d=>d.carrera).filter(Boolean))].sort();
+ lugs=[...new Set(data.map(d=>d.lugar).filter(Boolean))].sort();
  cubiertos=new Set(data.filter(d=>vis[d.id]).map(gk));render();
 }
 const loadX=()=>window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=no;document.head.append(s)});
@@ -98,7 +99,7 @@ function parse(buf){
  const wb=XLSX.read(buf,{type:'array'}),js=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
  return js.map((r,i)=>{const g=(...ks)=>{for(const k of ks){const f=Object.keys(r).find(x=>x.trim().toLowerCase()===k.toLowerCase());if(f!==undefined)return String(r[f]).trim()}return ''};
   const dr=g('Dia','Día').toUpperCase().replace('É','E').replace('Á','A'),e=g('Hora Entrada','HoraEntrada'),s=g('Hora Salida','HoraSalida');
-  return{id:'row_'+i,dia:DIAS.find(x=>dr.includes(x))||'LUN',horaEntrada:e,horaSalida:s,duracionHoras:dur(e,s),turno:turnoDe(+e.split(':')[0]||7),aula:g('Aula'),edificio:g('Edificio'),materia:g('Materia'),grupo:g('Grupo')||'A',curso:g('Curso')||'1',docente:g('Docente')||'Sin Docente',carrera:g('Carrera'),programados:parseInt(g('Nro de programados','Programados'))||0}});
+  return{id:'row_'+i,dia:DIAS.find(x=>dr.includes(x))||'LUN',horaEntrada:e,horaSalida:s,duracionHoras:dur(e,s),turno:turnoDe(+e.split(':')[0]||7),aula:g('Aula'),edificio:g('Edificio'),lugar:g('Lugar','Sede','Campus','Ubicacion','Ubicación'),materia:g('Materia'),grupo:g('Grupo')||'A',curso:g('Curso')||'1',docente:g('Docente')||'Sin Docente',carrera:g('Carrera'),programados:parseInt(g('Nro de programados','Programados'))||0}});
 }
 async function excel(f){
  if(!f)return;toast('Leyendo Excel…');
@@ -111,7 +112,7 @@ async function excel(f){
 /* ---------- Acciones ---------- */
 function mark(id){
  const d=data.find(x=>x.id===id);if(!d)return;vis[id]=1;keep();
- setD('visitas_aulas',id,{id,visitado:true,grupoClave:gk(d),carrera:d.carrera,curso:d.curso,materia:d.materia,grupo:d.grupo,aula:d.aula,docente:d.docente,conteoReal:cnt[id]??d.programados,fecha:new Date().toISOString()});
+ setD('visitas_aulas',id,{id,visitado:true,grupoClave:gk(d),carrera:d.carrera,curso:d.curso,materia:d.materia,grupo:d.grupo,aula:d.aula,lugar:d.lugar||'',docente:d.docente,conteoReal:cnt[id]??d.programados,fecha:new Date().toISOString()});
  derive();toast('Aula '+(d.aula||'S/A')+' visitada',[['Deshacer',()=>unmark(id)],['Contar',()=>cntSheet(id)]]);
 }
 function unmark(id){delete vis[id];delete cnt[id];keep();delD('visitas_aulas',id);derive()}
@@ -120,11 +121,13 @@ const cstep=n=>{$('#cN').value=Math.max(0,(+$('#cN').value||0)+n)};
 function csave(){const n=Math.max(0,+$('#cN').value||0);cnt[cid]=n;vis[cid]=1;keep();setD('visitas_aulas',cid,{id:cid,visitado:true,conteoReal:n});closeS();derive()}
 function car(m){cfg.car=m==='all'?null:[];saveCfg();carSheet()}
 function carSheet(){$('#carL').innerHTML=cars.map(c=>`<button class="${!cfg.car||cfg.car.includes(c)?'on':''}" data-c="${esc(c)}">${esc(c)}</button>`).join('')||'<span class=s>Carga el Excel primero.</span>'}
-const FLD=[['dia','Día','sel'],['horaEntrada','Entrada','time'],['horaSalida','Salida','time'],['aula','Aula'],['edificio','Edificio'],['materia','Materia','','w'],['grupo','Grupo'],['curso','Curso / Sem.'],['docente','Docente','','w'],['carrera','Carrera','','w','dl'],['programados','Estudiantes','number']];
-$('#eF').innerHTML=FLD.map(([k,l,t,w,dl])=>`<div class="${w||''}"><label>${l}</label>${t==='sel'?`<select id="f_${k}">${DIAS.map(d=>`<option>${d}</option>`).join('')}</select>`:`<input id="f_${k}" type="${t||'text'}" ${dl?'list=dl':''} ${t==='number'?'inputmode=numeric':''}>`}</div>`).join('');
+const FLD=[['dia','Día','sel'],['horaEntrada','Entrada','time'],['horaSalida','Salida','time'],['aula','Aula'],['edificio','Edificio'],['lugar','Lugar / Sede','','w','dlL'],['materia','Materia','','w'],['grupo','Grupo'],['curso','Curso / Sem.'],['docente','Docente','','w'],['carrera','Carrera','','w','dl'],['programados','Estudiantes','number']];
+$('#eF').innerHTML=FLD.map(([k,l,t,w,dl])=>`<div class="${w||''}"><label>${l}</label>${t==='sel'?`<select id="f_${k}">${DIAS.map(d=>`<option>${d}</option>`).join('')}</select>`:`<input id="f_${k}" type="${t||'text'}" ${dl?'list='+dl:''} ${t==='number'?'inputmode=numeric':''}>`}</div>`).join('');
 function editar(id){
- const d=id?data.find(x=>x.id===id):{dia,horaEntrada:'08:00',horaSalida:'10:00',grupo:'A',curso:'1',programados:0,carrera:cars[0]||''};eid=id||'new_'+Date.now();
- $('#dl').innerHTML=cars.map(c=>`<option value="${esc(c)}">`).join('');FLD.forEach(([k])=>$('#f_'+k).value=d[k]??'');
+ const d=id?data.find(x=>x.id===id):{dia,horaEntrada:'08:00',horaSalida:'10:00',grupo:'A',curso:'1',programados:0,carrera:cars[0]||'',lugar:cfg.lug||''};eid=id||'new_'+Date.now();
+ $('#dl').innerHTML=cars.map(c=>`<option value="${esc(c)}">`).join('');
+ $('#dlL').innerHTML=lugs.map(c=>`<option value="${esc(c)}">`).join('');
+ FLD.forEach(([k])=>$('#f_'+k).value=d[k]??'');
  $('#eT').textContent=id?'Editar horario':'Nuevo horario';$('#eD').style.display=id?'':'none';openS('sEd');
 }
 function esave(){
@@ -150,14 +153,15 @@ const ahora=d=>d.dia===hoy()&&mins(d.horaEntrada)<=nowM()&&mins(d.horaSalida)>no
 function card(d){
  const v=vis[d.id],[cn,cc]=cls(d.programados);
  return `<article class="c${v?' v':''}" style="--k:${cc}" data-id="${esc(d.id)}"><div class="t"><b>${esc(d.horaEntrada)}–${esc(d.horaSalida)}</b>${ahora(d)?'<i class="n">AHORA</i>':''}<span style="color:${cc}">${cn} · ${d.programados}</span></div>
- <h3>Aula ${esc(d.aula||'S/A')} <small>${esc(d.edificio)}</small></h3><p>${esc(d.materia)} · Gr. ${esc(d.grupo)}</p><p class="s">${esc(d.docente)} · ${esc(d.carrera)} · Sem ${esc(d.curso)}</p>
+ <h3>Aula ${esc(d.aula||'S/A')} <small>${esc([d.lugar,d.edificio].filter(Boolean).join(' · '))}</small></h3><p>${esc(d.materia)} · Gr. ${esc(d.grupo)}</p><p class="s">${esc(d.docente)} · ${esc(d.carrera)} · Sem ${esc(d.curso)}</p>
  <div class="a">${v?`<button class="g" data-a="cnt">✔ ${cnt[d.id]??d.programados} alumnos ✎</button><button data-a="del">Quitar</button>`:`<button class="p" data-a="ok">Marcar visitada</button><button data-a="ed">Editar</button>`}</div></article>`;
 }
 function ruta(){
  const all=rows().filter(d=>d.dia===dia&&(tur==='TODOS'||d.turno===tur)),nv=all.filter(d=>vis[d.id]).length;
  const est=all.reduce((s,d)=>s+d.programados,0),ev=all.filter(d=>vis[d.id]).reduce((s,d)=>s+(cnt[d.id]??d.programados),0);
- const seg=(a,k,cur)=>`<div class="seg">${a.map(([v,l])=>`<button data-${k}="${v}" class="${v===cur?'on':''}">${l}</button>`).join('')}</div>`;
+ const seg=(a,k,cur)=>`<div class="seg">${a.map(([v,l])=>`<button data-${k}="${esc(v)}" class="${v===cur?'on':''}">${esc(l)}</button>`).join('')}</div>`;
  $('#rTop').innerHTML=`<div class="k"><div class="row"><div><b>${nv} de ${all.length} clases visitadas</b><span>${est?Math.min(100,Math.round(ev/est*100)):0}% alumnos</span></div><div class="bar"><i style="width:${all.length?nv/all.length*100:0}%"></i></div></div></div>`
+ +(lugs.length?seg([['','📍 Todos los lugares'],...lugs.map(l=>[l,l])],'l',cfg.lug||''):'')
  +seg([['MAÑANA','Mañana'],['TARDE','Tarde'],['NOCHE','Noche'],['TODOS','Todos']],'u',tur)+seg([['pend','Pendientes'],['vis','Visitadas'],['all','Todas']],'v',vista)
  +`<div class="seg"><button data-o="1">Orden: ${cfg.ord==='hora'?'por hora':'por tamaño'}</button><button data-f="term" class="${cfg.term?'on':''}">Ocultar terminadas</button><button data-f="cub" class="${cfg.cub?'on':''}">Ocultar cubiertas</button></div>`;
  lista(all);
@@ -165,7 +169,7 @@ function ruta(){
 function lista(all){
  all=all||rows().filter(d=>d.dia===dia&&(tur==='TODOS'||d.turno===tur));
  const q=$('#q').value.toLowerCase();let l=all,h=0;
- if(q)l=l.filter(d=>[d.aula,d.materia,d.docente,d.edificio,d.curso,d.grupo].join(' ').toLowerCase().includes(q));
+ if(q)l=l.filter(d=>[d.aula,d.materia,d.docente,d.edificio,d.lugar,d.curso,d.grupo].join(' ').toLowerCase().includes(q));
  if(vista==='pend')l=l.filter(d=>{if(vis[d.id])return false;if((cfg.cub&&cubiertos.has(gk(d)))||(cfg.term&&dia===hoy()&&mins(d.horaSalida)<=nowM())){h++;return false}return true});
  else if(vista==='vis')l=l.filter(d=>vis[d.id]);
  l.sort((a,b)=>cfg.ord==='hora'?(ahora(b)-ahora(a))||mins(a.horaEntrada)-mins(b.horaEntrada)||b.programados-a.programados:b.programados-a.programados||mins(a.horaEntrada)-mins(b.horaEntrada));
@@ -184,7 +188,7 @@ function avance(){
  const A=new Set(r.filter(d=>vis[d.id]&&d.aula).map(d=>d.carrera+d.aula)).size,AT=new Set(r.filter(d=>d.aula).map(d=>d.carrera+d.aula)).size,p=T?Math.round(C/T*100):0;
  const br=Object.entries(pc).sort((a,b)=>(b[1][1]-b[1][0])-(a[1][1]-a[1][0]))[0];
  const top=docs().sort((a,b)=>b.e-a.e).slice(0,8);
- $('#v-avance').innerHTML=`<div class="k"><div class="big">${p}%</div><p>de estudiantes alcanzados</p><div class="g3"><div><b>${T.toLocaleString()}</b>únicos</div><div><b>${C.toLocaleString()}</b>contactados</div><div><b>${A}/${AT}</b>aulas</div></div></div>
+ $('#v-avance').innerHTML=`<div class="k"><div class="big">${p}%</div><p>de estudiantes alcanzados${cfg.lug?' · '+esc(cfg.lug):''}</p><div class="g3"><div><b>${T.toLocaleString()}</b>únicos</div><div><b>${C.toLocaleString()}</b>contactados</div><div><b>${A}/${AT}</b>aulas</div></div></div>
  <div class="k"><h4>Qué hacer ahora</h4><p>${p<50?'Ir primero a los grupos masivos sin visita.':p<80?'Cerrar los grupos pendientes más grandes.':'Completar los últimos grupos y validar datos.'}</p>${br?`<p class="s">Mayor brecha: ${esc(br[0])} con ${(br[1][1]-br[1][0]).toLocaleString()} estudiantes pendientes.</p>`:''}</div>
  <div class="k"><h4>Cobertura por semestre</h4>${Object.entries(pc).sort().map(([k,v])=>bar(k,...v)).join('')}</div>
  <div class="k"><h4>Cobertura por carrera</h4>${Object.entries(pk).sort().map(([k,v])=>bar(k,...v)).join('')}</div>
@@ -194,7 +198,7 @@ let dv='doc';
 function datosV(){
  const seg=`<div class="seg"><button data-dv="doc" class="${dv==='doc'?'on':''}">Docentes</button><button data-dv="cur" class="${dv==='cur'?'on':''}">Cursos y grupos</button></div>`;
  if(dv==='doc'){
-  $('#v-datos').innerHTML=seg+docs().sort((a,b)=>a.n.localeCompare(b.n)).map(o=>`<details><summary>${esc(o.n)} <small class="s">· ${o.h} h/sem · ${o.e} alumnos</small></summary><p class="s">${esc([...o.m].join(', '))} · ${o.h*4} h/mes</p>${o.s.map(c=>`<p class="s">${c.dia} ${esc(c.horaEntrada)}–${esc(c.horaSalida)} · Aula ${esc(c.aula)} · ${esc(c.materia)} Gr.${esc(c.grupo)} (${c.programados})</p>`).join('')}</details>`).join('')||'<div class="e">Sin datos</div>';
+  $('#v-datos').innerHTML=seg+docs().sort((a,b)=>a.n.localeCompare(b.n)).map(o=>`<details><summary>${esc(o.n)} <small class="s">· ${o.h} h/sem · ${o.e} alumnos</small></summary><p class="s">${esc([...o.m].join(', '))} · ${o.h*4} h/mes</p>${o.s.map(c=>`<p class="s">${c.dia} ${esc(c.horaEntrada)}–${esc(c.horaSalida)} · ${esc(c.lugar?c.lugar+' · ':'')}Aula ${esc(c.aula)} · ${esc(c.materia)} Gr.${esc(c.grupo)} (${c.programados})</p>`).join('')}</details>`).join('')||'<div class="e">Sin datos</div>';
  }else{
   const t={};rows().forEach(d=>{((t[d.curso]??={})[d.materia]??={})[d.grupo]=d});
   $('#v-datos').innerHTML=seg+Object.keys(t).sort().map(c=>`<details><summary>Semestre ${esc(c)}</summary>${Object.keys(t[c]).sort().map(m=>`<p><b>${esc(m)}</b></p>${Object.entries(t[c][m]).map(([g,d])=>`<p class="s">Gr. ${esc(g)} · ${esc(d.docente)} · ${d.programados} alumnos</p>`).join('')}`).join('')}</details>`).join('');
@@ -202,7 +206,8 @@ function datosV(){
 }
 const RULES=`rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
 function ajustes(){
- $('#v-ajustes').innerHTML=`<div class="k"><h4>Horarios</h4><p class="s">${data.length} clases${meta?' · Excel: '+esc(meta.name):''}</p><input type="file" id="xl" accept=".xlsx,.xls"><p class="s">Al cargarlo se guarda en la nube y todos tus dispositivos lo usan sin volver a subirlo.</p></div>
+ $('#v-ajustes').innerHTML=`<div class="k"><h4>Horarios</h4><p class="s">${data.length} clases${meta?' · Excel: '+esc(meta.name):''}</p><input type="file" id="xl" accept=".xlsx,.xls"><p class="s">Al cargarlo se guarda en la nube y todos tus dispositivos lo usan sin volver a subirlo. El Excel debe tener una columna <b>Lugar</b> (o Sede / Campus) para poder filtrar por lugar.</p></div>
+ <div class="k"><h4>Lugares</h4><p class="s">${lugs.length?lugs.map(esc).join(' · '):'No se detectó la columna Lugar en el Excel.'}</p></div>
  <div class="k"><h4>Carreras</h4><button style="width:100%" onclick="openS('sCar')">Elegir carreras (${cfg.car?cfg.car.length:cars.length}/${cars.length})</button><p class="s">La configuración se guarda sola.</p></div>
  <details><summary>Reglas de Firestore</summary><p class="s">En Firebase → Firestore → Reglas: borra todo (Ctrl+A), pega solo esto y publica.</p><pre>${esc(RULES)}</pre><button onclick="navigator.clipboard.writeText(RULES).then(()=>toast('Copiado'))">Copiar reglas</button></details>
  <details><summary>Zona de riesgo</summary><p class="s">Para empezar una semana nueva.</p><button class="x" onclick="borrarVisitas()">Borrar todas las visitas</button></details>`;
@@ -233,6 +238,7 @@ document.addEventListener('click',e=>{
  const c=b.closest('article');if(c&&D.a){const id=c.dataset.id;({ok:mark,del:unmark,cnt:cntSheet,ed:editar})[D.a](id)}
 });
 $('#rTop').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const D=b.dataset;
+ if(D.l!==undefined){cfg.lug=D.l||null;lim=60;saveCfg();return}
  if(D.u){tur=D.u;lim=60;render()}if(D.v){vista=D.v;lim=60;render()}});
 $('#q').addEventListener('input',()=>{lim=60;lista()});
 addEventListener('online',status);addEventListener('offline',status);
@@ -243,7 +249,7 @@ if(!base.length)fetch('vidal.xlsx').then(r=>r.ok?r.arrayBuffer():Promise.reject(
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import*as M from"https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-const app=initializeApp({apiKey:"AIzaSyD91gM_l8WQMkuaMIq_6Fsr8bb0K9058I8",authDomain:"torrez-direccion.firebaseapp.com",projectId:"torrez-direccion",storageBucket:"torrez-direccion.firebasestorage.app",messagingSenderId:"458114495406",appId:"1:458114495406:web:9c4e0b7cbec270c86e0e3f"});
+const app=initializeApp({apiKey:"AIzaSyAj6bgz3wvrXPm1cBTGj8qXD6jJ68P9Hho",authDomain:"vidal-decano.firebaseapp.com",projectId:"vidal-decano",storageBucket:"vidal-decano.firebasestorage.app",messagingSenderId:"866210184425",appId:"1:866210184425:web:a076ec78e2c5567dea8478"});
 let db;try{db=M.initializeFirestore(app,{localCache:M.persistentLocalCache({tabManager:M.persistentMultipleTabManager()})})}catch{db=M.getFirestore(app)}
 window.fbReady({db,doc:M.doc,setDoc:M.setDoc,deleteDoc:M.deleteDoc,onSnapshot:M.onSnapshot,collection:M.collection,writeBatch:M.writeBatch});
 </script>
