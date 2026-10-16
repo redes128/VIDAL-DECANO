@@ -94,7 +94,7 @@ function derive(){
  for(const c of Object.values(custom)){if(c._deleted){del.add(c.id);continue}const i=m.findIndex(x=>x.id===c.id);i>=0?m[i]={...m[i],...c}:m.push({...c})}
  data=m.filter(x=>!del.has(x.id));cars=[...new Set(data.map(d=>d.carrera).filter(Boolean))].sort();
  lugs=[...new Set(data.map(d=>d.lugar).filter(Boolean))].sort();
- cubiertos=new Set(data.filter(d=>vis[d.id]).map(gk));render();
+ cubiertos=new Set(data.filter(d=>vis[d.id]).map(d=>`${d.dia}|${gk(d)}`));render();
 }
 const loadX=()=>window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=no;document.head.append(s)});
 function parse(buf){
@@ -172,7 +172,7 @@ function lista(all){
  all=all||rows().filter(d=>d.dia===dia&&(tur==='TODOS'||d.turno===tur));
  const q=$('#q').value.toLowerCase();let l=all,h=0;
  if(q)l=l.filter(d=>[d.aula,d.materia,d.docente,d.edificio,d.lugar,d.curso,d.grupo].join(' ').toLowerCase().includes(q));
- if(vista==='pend')l=l.filter(d=>{if(vis[d.id])return false;if((cfg.cub&&cubiertos.has(gk(d)))||(cfg.term&&dia===hoy()&&mins(d.horaSalida)<=nowM())){h++;return false}return true});
+ if(vista==='pend')l=l.filter(d=>{if(vis[d.id])return false;if((cfg.cub&&cubiertos.has(`${d.dia}|${gk(d)}`))||(cfg.term&&dia===hoy()&&mins(d.horaSalida)<=nowM())){h++;return false}return true});
  else if(vista==='vis')l=l.filter(d=>vis[d.id]);
  l.sort((a,b)=>cfg.ord==='hora'?(ahora(b)-ahora(a))||mins(a.horaEntrada)-mins(b.horaEntrada)||b.programados-a.programados:b.programados-a.programados||mins(a.horaEntrada)-mins(b.horaEntrada));
  $('#lista').innerHTML=(l.slice(0,lim).map(card).join('')||`<div class="e">${data.length?(vista==='pend'?'Nada pendiente aquí ✔':'Sin resultados'):'Aún no hay horarios. Ve a Ajustes y carga el Excel.'}</div>`)
